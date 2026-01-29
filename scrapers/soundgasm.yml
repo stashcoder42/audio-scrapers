@@ -1,0 +1,28 @@
+name: "Soundgasm"
+audioByURL:
+  - action: scrapeXPath
+    url:
+      - "soundgasm.net/u/"
+    scraper: soundgasmAudio
+
+xPathScrapers:
+  soundgasmAudio:
+    audio:
+      Title:
+        selector: //div[@class="jp-title"]/text()
+      Details:
+        selector: //div[@class="jp-description"]//p/text()
+      Performers:
+        Name:
+          selector: //div[contains(@style,"margin")]/a[contains(@href,"/u/")]/text()
+      Tags:
+        Name:
+          selector: //div[@class="jp-description"]//p/text()
+          postProcess:
+            - javascript: |
+                var matches = value.match(/\[([^\]]+)\]/g);
+                if (matches) {
+                  return matches.map(function(m) { return m.slice(1, -1); }).join('\n');
+                }
+                return '';
+          split: "\n"
