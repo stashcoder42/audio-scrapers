@@ -58,3 +58,6 @@ buildScraper()
 for f in ./scrapers/*.yml; do
     buildScraper "$f"
 done
+
+# copy index.html to root of site
+cp index.html "$outdir/"
