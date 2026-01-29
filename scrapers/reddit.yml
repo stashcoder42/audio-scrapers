@@ -1,0 +1,62 @@
+name: "Reddit"
+audioByURL:
+  - action: scrapeJson
+    url:
+      - reddit.com
+      - old.reddit.com
+    queryURL: https://api.reddit.com/api/info?id=t3_{url}
+    queryURLReplace:
+      url:
+        - regex: '.+/comments/([a-z0-9]+)/.+'
+          with: "${1}"
+    scraper: redditAudioScraper
+
+jsonScrapers:
+  redditAudioScraper:
+    audio:
+      Title:
+        selector: data.children.0.data.title
+        postProcess:
+          - javascript: |
+              // Remove all bracketed tags like [F4M] for cleaner display
+              return value.replace(/\[[^\]]+\]\s*/g, '').trim();
+      Details: data.children.0.data.selftext
+      Date:
+        selector: data.children.0.data.created_utc
+        postProcess:
+          - parseDate: unix
+      Performers:
+        Name: data.children.0.data.author
+        URLs:
+          selector: data.children.0.data.author
+          postProcess:
+            - javascript: |
+                return 'https://www.reddit.com/user/' + value;
+      Tags:
+        Name:
+          selector: data.children.0.data.title
+          postProcess:
+            - javascript: |
+                var matches = value.match(/\[([^\]]+)\]/g);
+                if (matches) {
+                  return matches.map(function(m) { return m.slice(1, -1); }).join('\n');
+                }
+                return '';
+          split: "\n"
+      URLs:
+        selector: data.children.0.data.selftext
+        postProcess:
+          - javascript: |
+              // Extract soundgasm and whyp links from selftext
+              var urls = [];
+              var soundgasm = value.match(/https?:\/\/soundgasm\.net\/u\/[^\s\)\]]+/g);
+              var whyp = value.match(/https?:\/\/whyp\.it\/tracks\/[^\s\)\]]+/g);
+              if (soundgasm) urls = urls.concat(soundgasm);
+              if (whyp) urls = urls.concat(whyp);
+              return urls.join('\n');
+        split: "\n"
+
+driver:
+  headers:
+    - Key: User-Agent
+      Value: stashapp/audio-scrapers:v1 (by /u/stashcoder42)
