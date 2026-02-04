@@ -11,14 +11,33 @@ xPathScrapers:
       Title:
         selector: //div[@class="jp-title"]/text()
       Details:
-        selector: //div[@class="jp-description"]//p/text()
+        selector: //div[@class="jp-description"]//p
+        postProcess:
+          - replace:
+              - regex: <br\s*/?>
+                with: "\n"
+          - replace:
+              - regex: <[^>]+>
+                with: ""
+          - replace:
+              - regex: "\\n\\n\\n+"
+                with: "\n\n"
       Performers:
         Name:
           selector: //div[contains(@style,"margin")]/a[contains(@href,"/u/")]/text()
+        URLs:
+          selector: //div[contains(@style,"margin")]/a[contains(@href,"/u/")]/@href
+          postProcess:
+            - replace:
+                - regex: ^/u/(.+)/?$
+                  with: https://soundgasm.net/u/$1
       Tags:
         Name:
-          selector: //div[@class="jp-description"]//p/text()
+          selector: //div[@class="jp-description"]//p
           postProcess:
+            - replace:
+                - regex: <[^>]+>
+                  with: ""
             - javascript: |
                 var matches = value.match(/\[([^\]]+)\]/g);
                 if (matches) {

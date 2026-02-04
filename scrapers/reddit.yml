@@ -20,7 +20,42 @@ jsonScrapers:
           - javascript: |
               // Remove all bracketed tags like [F4M] for cleaner display
               return value.replace(/\[[^\]]+\]\s*/g, '').trim();
-      Details: data.children.0.data.selftext
+      Details:
+        selector: data.children.0.data.selftext
+        postProcess:
+          - javascript: |
+              // Decode HTML entities first (before extracting links)
+              value = value.replace(/&amp;/g, '&');
+              value = value.replace(/&lt;/g, '<');
+              value = value.replace(/&gt;/g, '>');
+              value = value.replace(/&quot;/g, '"');
+              value = value.replace(/&#39;/g, "'");
+              // Helper to strip utm_ parameters from URLs
+              function stripUtm(url) {
+                return url.replace(/[?&]utm_[^&]+/g, '').replace(/\?&/, '?').replace(/\?$/, '');
+              }
+              // Collect links and convert to reference-style [n] with footnotes
+              var links = [];
+              value = value.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(match, text, url) {
+                links.push(stripUtm(url));
+                return text + ' [' + links.length + ']';
+              });
+              // Remove bold markers
+              value = value.replace(/\*\*([^*]+)\*\*/g, '$1');
+              // Remove italic markers
+              value = value.replace(/\*([^*]+)\*/g, '$1');
+              // Remove heading markers
+              value = value.replace(/^#{1,6}\s*/gm, '');
+              // Clean up excessive newlines
+              value = value.replace(/\n{3,}/g, '\n\n');
+              // Add footnotes if there are links
+              if (links.length > 0) {
+                value = value.trim() + '\n\n---\n';
+                for (var i = 0; i < links.length; i++) {
+                  value += '[' + (i + 1) + '] ' + links[i] + '\n';
+                }
+              }
+              return value.trim();
       Date:
         selector: data.children.0.data.created_utc
         postProcess:
