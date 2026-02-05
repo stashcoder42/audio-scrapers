@@ -21,51 +21,79 @@ jsonScrapers:
               // Remove all bracketed tags like [F4M] for cleaner display
               return value.replace(/\[[^\]]+\]\s*/g, '').trim();
       Details:
-        selector: data.children.0.data.selftext
+        selector: "data.children.0.data.{selftext,title}"
         postProcess:
           - javascript: |
+              // gjson multipath returns JSON object with both fields
+              var obj;
+              try {
+                obj = JSON.parse(value);
+              } catch (e) {
+                // Fallback: value might be just selftext
+                obj = { selftext: value, title: '' };
+              }
+              var selftext = obj.selftext || '';
+              var title = obj.title || '';
+
+              // If post is deleted, use the full title as description
+              if (selftext === '[deleted]' || selftext === '[removed]' || selftext.trim() === '') {
+                return title;
+              }
+
               // Decode HTML entities first (before extracting links)
-              value = value.replace(/&amp;/g, '&');
-              value = value.replace(/&lt;/g, '<');
-              value = value.replace(/&gt;/g, '>');
-              value = value.replace(/&quot;/g, '"');
-              value = value.replace(/&#39;/g, "'");
+              selftext = selftext.replace(/&amp;/g, '&');
+              selftext = selftext.replace(/&lt;/g, '<');
+              selftext = selftext.replace(/&gt;/g, '>');
+              selftext = selftext.replace(/&quot;/g, '"');
+              selftext = selftext.replace(/&#39;/g, "'");
               // Helper to strip utm_ parameters from URLs
               function stripUtm(url) {
                 return url.replace(/[?&]utm_[^&]+/g, '').replace(/\?&/, '?').replace(/\?$/, '');
               }
               // Collect links and convert to reference-style [n] with footnotes
               var links = [];
-              value = value.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(match, text, url) {
+              selftext = selftext.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(match, text, url) {
                 links.push(stripUtm(url));
                 return text + ' [' + links.length + ']';
               });
               // Remove bold markers
-              value = value.replace(/\*\*([^*]+)\*\*/g, '$1');
+              selftext = selftext.replace(/\*\*([^*]+)\*\*/g, '$1');
               // Remove italic markers
-              value = value.replace(/\*([^*]+)\*/g, '$1');
+              selftext = selftext.replace(/\*([^*]+)\*/g, '$1');
               // Remove heading markers
-              value = value.replace(/^#{1,6}\s*/gm, '');
+              selftext = selftext.replace(/^#{1,6}\s*/gm, '');
               // Clean up excessive newlines
-              value = value.replace(/\n{3,}/g, '\n\n');
+              selftext = selftext.replace(/\n{3,}/g, '\n\n');
               // Add footnotes if there are links
               if (links.length > 0) {
-                value = value.trim() + '\n\n---\n';
+                selftext = selftext.trim() + '\n\n---\n';
                 for (var i = 0; i < links.length; i++) {
-                  value += '[' + (i + 1) + '] ' + links[i] + '\n';
+                  selftext += '[' + (i + 1) + '] ' + links[i] + '\n';
                 }
               }
-              return value.trim();
+              return selftext.trim();
       Date:
         selector: data.children.0.data.created_utc
         postProcess:
           - parseDate: unix
       Performers:
-        Name: data.children.0.data.author
+        Name:
+          selector: data.children.0.data.author
+          postProcess:
+            - javascript: |
+                // Don't return [deleted] as performer name
+                if (value === '[deleted]' || value === '[removed]') {
+                  return '';
+                }
+                return value;
         URLs:
           selector: data.children.0.data.author
           postProcess:
             - javascript: |
+                // Don't return URL for deleted users
+                if (value === '[deleted]' || value === '[removed]') {
+                  return '';
+                }
                 return 'https://www.reddit.com/user/' + value;
       Tags:
         Name:
